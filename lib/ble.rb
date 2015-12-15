@@ -1,13 +1,20 @@
+# coding: utf-8
 require 'dbus'
 require 'logger'
 
 # https://github.com/mvidner/ruby-dbus/blob/master/doc/Tutorial.md
 # https://kernel.googlesource.com/pub/scm/bluetooth/bluez/+/refs/heads/master/doc/
 
+
+#
 module BLE
-    UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    
+
+    private
     I_ADAPTER              = 'org.bluez.Adapter1'
     I_DEVICE               = 'org.bluez.Device1'
+    I_AGENT_MANAGER        = 'org.bluez.AgentManager1'
+    I_AGENT                = 'org.bluez.Agent1'
     I_GATT_CHARACTERISTIC  = 'org.bluez.GattCharacteristic1'
     I_GATT_SERVICE         = 'org.bluez.GattService1'
     I_PROXIMITY_REPORTER   = 'org.bluez.ProximityReporter1'
@@ -33,7 +40,11 @@ module BLE
     E_UNKNOWN_OBJECT       = 'org.freedesktop.DBus.Error.UnknownObject'
     E_INVALID_ARGS         = 'org.freedesktop.DBus.Error.InvalidArgs'
     E_INVALID_SIGNATURE    = 'org.freedesktop.DBus.Error.InvalidSignature'
-    
+
+    DBUS  = DBus.system_bus
+    BLUEZ = DBUS.service('org.bluez')
+
+    public
     class Error                  < StandardError ; end
     class NotYetImplemented      < Error         ; end
     class StalledObject          < Error         ; end
@@ -44,14 +55,30 @@ module BLE
     class CharacteristicNotFound < NotFound      ; end
     class AccessUnavailable      < Error         ; end
     
-    
+
+    GATT_BASE_UUID="00000000-0000-1000-8000-00805F9B34FB"
+
     #"DisplayOnly", "DisplayYesNo", "KeyboardOnly",
     # "NoInputNoOutput" and "KeyboardDisplay" which
 
+
+    def self.registerAgent(agent, service, path)
+        raise NotYetImplemented
+        bus = DBus.session_bus
+        service = bus.request_service("org.ruby.service")
+        
+        service.export(BLE::Agent.new(agent_path))
+        
+        o_bluez = BLUEZ.object('/org/bluez')
+        o_bluez.introspect
+        o_bluez[I_AGENT_MANAGER].RegisterAgent(agent_path, "NoInputNoOutput")
+    end
+
+    
     class Agent < DBus::Object
         @log = Logger.new($stdout)
         # https://kernel.googlesource.com/pub/scm/bluetooth/bluez/+/refs/heads/master/doc/agent-api.txt
-        dbus_interface "org.bluez.Agent" do
+        dbus_interface I_AGENT do
             dbus_method :Release do
                 @log.debug "Release()"
                 exit false
@@ -94,8 +121,25 @@ module BLE
     end
 
 
-
+    # Adapter class
+    #   Adapter.list
+    #   a = Adapter.new('hci0')
+    #   a.start_discover ; sleep(10) ; a.stop_discovery
+    #   a.devices
+    #
     class Adapter
+        # Return a list of available unix device name for the
+        # adapter installed on the system.
+        # @return [Array<String>] list of unix device name
+        def self.list
+            o_bluez = BLUEZ.object('/org/bluez')
+            o_bluez.introspect
+            o_bluez.subnodes.reject {|adapter| ['test'].include?(adapter) }
+        end
+
+        # Create a new Adapter
+        #
+        # @param iface [String] name of the Unix device
         def initialize(iface)
             @iface     = iface.dup.freeze
             @o_adapter = BLUEZ.object("/org/bluez/#{@iface}")
@@ -115,34 +159,47 @@ module BLE
         end
 
         # The Bluetooth interface name
+        # @return [String] name of the Unix device
         def iface
             @iface
         end
 
         # The Bluetooth device address.
+        # @return [String] MAC address of the adapter
         def address
             @o_adapter[I_ADAPTER]['Address']
         end
 
         # The Bluetooth system name (pretty hostname).
+        # @return [String]
         def name
             @o_adapter[I_ADAPTER]['Name']
         end
 
         # The Bluetooth friendly name.
         # In case no alias is set, it will return the system provided name.
+        # @return [String]
         def alias
             @o_adapter[I_ADAPTER]['Alias']
         end
-        # Set the alias name
+
+        # Set the alias name.
+        #
         # When resetting the alias with an empty string, the
-	# property will default back to system name
+        # property will default back to system name
+        #
+        # @param val [String] new alias name.
+        # @return [void]
         def alias=(val)
             @o_adapter[I_ADAPTER]['Alias'] = val.nil? ? '' : val.to_str
+            nil
         end
 
         # Return the device corresponding to the given address.
-        # The device object returned as a dependency on the adapter
+        # @note The device object returned has a dependency on the adapter.
+        #
+        # @param address MAC address of the device
+        # @return [Device] a device 
         def [](address)
             Device.new(@iface, address)
         end
@@ -150,6 +207,7 @@ module BLE
         # This method sets the device discovery filter for the caller.
         # When this method is called with nil or an empty list of UUIDs,
         # filter is removed.
+        #
         # @param uuids     a list of uuid to filter on
         # @param rssi      RSSI threshold
         # @param pathloss  pathloss threshold
@@ -181,11 +239,13 @@ module BLE
             self
         end
 
-        # This method starts the device discovery session. This
-	# includes an inquiry procedure and remote device name resolving.
-        # Use #stop_discovery to release the sessions acquired.
-	# This process will start creating device objects as new devices
+        # Starts the device discovery session.
+        # This includes an inquiry procedure and remote device name resolving.
+        # Use stop_discovery to release the sessions acquired.
+        # This process will start creating device objects as new devices
         # are discovered.
+        #
+        # @return [Boolean]
         def start_discovery
             @o_adapter[I_ADAPTER].StartDiscovery
             true
@@ -197,10 +257,13 @@ module BLE
             end
         end
 
-        # This method will cancel any previous #start_discovery transaction.
-	# Note that a discovery procedure is shared between all
-	# discovery sessions thus calling stop_discovery will only
-	# release a single session.
+        # This method will cancel any previous #start_discovery
+        # transaction.
+        # @note The discovery procedure is shared
+        # between all discovery sessions thus calling stop_discovery
+        # will only release a single session.
+        #
+        # @return [Boolean]
         def stop_discovery
             @o_adapter[I_ADAPTER].StopDiscovery
             true
@@ -213,7 +276,10 @@ module BLE
             end
 
         end
-        
+
+        # List of devices MAC address that have been discovered.
+        #
+        # @return [Array<String>] List of devices MAC address.
         def devices
             @o_adapter.introspect # Force refresh
             @o_adapter.subnodes.map {|dev| # Format: dev_aa_bb_cc_dd_ee_ff
@@ -221,7 +287,18 @@ module BLE
         end
     end
 
+    # Create de Device object
+    #   d = Device::new('hci0', 'aa:bb:dd:dd:ee:ff')
+    #   d = Adapter.new('hci0')['aa:bb:dd:dd:ee:ff']
+    #
+    #   d.services
+    #   d.characteristics(:environmental_sensing)
+    #   d[:environmental_sensing, :temperature]
+    #
     class Device
+        # @param adapter
+        # @param dev
+        # @param auto_refresh
         def initialize(adapter, dev, auto_refresh: true)
             @adapter, @dev = adapter, dev
             @auto_refresh  = auto_refresh
@@ -257,6 +334,7 @@ module BLE
 
         # This removes the remote device object.
         # It will remove also the pairing information.
+        # @return [Boolean]
         def remove
             @o_adapter[I_ADAPTER].RemoveDevice(@p_dev)
             true
@@ -271,16 +349,17 @@ module BLE
         
 
         # This method will connect to the remote device,
-	# initiate pairing and then retrieve all SDP records
-	# (or GATT primary services).
-	# If the application has registered its own agent,
+        # initiate pairing and then retrieve all SDP records
+        # (or GATT primary services).
+        # If the application has registered its own agent,
         # then that specific agent will be used. Otherwise
-	# it will use the default agent.
-	# Only for applications like a pairing wizard it
-	# would make sense to have its own agent. In almost
-	# all other cases the default agent will handle this just fine.
-	# In case there is no application agent and also
-	# no default agent present, this method will fail.
+        # it will use the default agent.
+        # Only for applications like a pairing wizard it
+        # would make sense to have its own agent. In almost
+        # all other cases the default agent will handle this just fine.
+        # In case there is no application agent and also
+        # no default agent present, this method will fail.
+        # @return [Boolean]
         def pair
             @o_dev[I_DEVICE].Pair
             true
@@ -299,7 +378,8 @@ module BLE
         end
 
         # This method can be used to cancel a pairing
-	# operation initiated by the Pair method.
+        # operation initiated by the Pair method.
+        # @return [Boolean]
         def cancel_pairing
             @o_dev[I_DEVICE].CancelPairing
             true
@@ -312,15 +392,16 @@ module BLE
         end
 
         # This connect to the specified profile UUID or to any (:all)
-	# profiles the remote device supports that can be connected
-	# to and have been flagged as auto-connectable on our side.
-        # If only subset of profiles is already connected it will
-        # try to connect currently disconnected ones.
-	# If at least one profile was connected successfully this
-	# method will indicate success.
+        # profiles the remote device supports that can be connected to
+        # and have been flagged as auto-connectable on our side.  If
+        # only subset of profiles is already connected it will try to
+        # connect currently disconnected ones.  If at least one
+        # profile was connected successfully this method will indicate
+        # success.
+        # @return [Boolean]
         def connect(profile=:all)
             case profile
-            when UUID_REGEX
+            when UUID::REGEX
                 @o_dev[I_DEVICE].ConnectProfile(profile)
             when :all
                 @o_dev[I_DEVICE].Connect()
@@ -349,10 +430,11 @@ module BLE
         # call before a reply to it has been received.
         # If a profile UUID is specified, only this profile is disconnected,
         # and as their is no connection tracking for a profile, so
-	# as long as the profile is registered this will always succeed
+        # as long as the profile is registered this will always succeed
+        # @return [Boolean]
         def disconnect(profile=:all)
             case profile
-            when UUID_REGEX
+            when UUID::REGEX
                 @o_dev[I_DEVICE].DisconnectProfile(profile)
             when :all
                 @o_dev[I_DEVICE].Disconnect()
@@ -399,27 +481,30 @@ module BLE
         end
 
         # List of available services as UUID
+        #
         # @raise [NotConnected] if device is not in a connected state
         # @note The list is retrieve once when object is
         #       connected if auto_refresh is enable, otherwise
         #       you need to call #refresh
         # @note This is the list of UUID for which we have an entry
         #       in the bluez-dbus
+        # @return [Array<String>] List of service UUID
         def services
             raise NotConnected unless is_connected?
             @services.keys
         end
 
         # Check if service is available on the device
-        # @return [true, false]
+        # @return [Boolean]
         def has_service?(service)
             @service.key?(_uuid_service(service))
         end
         
         # List of available characteristics UUID for a service
+        #
         # @param service service can be a UUID, a service type or
         #               a service nickname
-        # @return [Array, nil] list of characteristics or nil if the
+        # @return [Array<String>, nil] list of characteristics or nil if the
         #                      service doesn't exist
         # @raise [NotConnected] if device is not in a connected state
         # @note The list is retrieve once when object is
@@ -432,52 +517,8 @@ module BLE
             end
         end
 
-        def _characteristics(service)
-            if srv = @services[_uuid_service(service)]
-                srv[:characteristics]
-            end
-        end
-        def _uuid_service(service)
-            uuid = case service
-                   when Symbol
-                       if i = Service::NICKNAME[service]
-                           i[:uuid]
-                       end
-                   when UUID_REGEX
-                       service.downcase
-                   when String
-                       if i = Service::TYPE[service]
-                           i[:uuid]
-                       end
-                   end
-            if uuid.nil?
-                raise ArgumentError, "unable to get UUID for service"
-            end
-
-            uuid
-        end
-        def _uuid_characteristic(characteristic)
-            uuid = case characteristic
-                   when Symbol
-                       if i = Characteristic::NICKNAME[characteristic]
-                           i[:uuid]
-                       end
-                   when UUID_REGEX
-                       characteristic.downcase
-                   when String
-                       if i = Characteristic::TYPE[characteristic]
-                           i[:uuid]
-                       end
-                   end
-            if uuid.nil?
-                raise ArgumentError, "unable to get UUID for service"
-            end
-
-            uuid
-        end
-
-
         # The Bluetooth device address of the remote device
+        # @return [String]
         def address
             @o_dev[I_DEVICE]['Address']
         end
@@ -485,30 +526,37 @@ module BLE
         # The Bluetooth remote name.
         # It is better to always use the #alias when displaying the
         # devices name. 
+        # @return [String]
         def name # optional
             @o_dev[I_DEVICE]['Name']
         end
 
         # The name alias for the remote device.
         # The alias can be used to have a different friendly name for the
-	# remote device.
+        # remote device.
         # In case no alias is set, it will return the remote device name.
+        # @return [String]
         def alias
             @o_dev[I_DEVICE]['Alias']
         end
         # Setting an empty string or nil as alias will convert it
         # back to the remote device name.
+        # @param val [String, nil]
+        # @return [void]
         def alias=(val)
             @o_dev[I_DEVICE]['Alias'] = val.nil? ? "" : val.to_str
         end
 
         # Is the device trusted?
+        # @return [Boolean]
         def is_trusted?
             @o_dev[I_DEVICE]['Trusted']
         end
 
         # Indicates if the remote is seen as trusted. This
-	# setting can be changed by the application.
+        # setting can be changed by the application.
+        # @param val [Boolean]
+        # @return [void]
         def trusted=(val)
             if ! [ true, false ].include?(val)
                 raise ArgumentError, "value must be a boolean"
@@ -517,14 +565,17 @@ module BLE
         end
 
         # Is the device blocked?
+        # @return [Boolean]
         def is_blocked?
             @o_dev[I_DEVICE]['Blocked']
         end
 
         # if set to true any incoming connections from the
-	# device will be immediately rejected. Any device
-	# drivers will also be removed and no new ones will
-	# be probed as long as the device is blocked
+        # device will be immediately rejected. Any device
+        # drivers will also be removed and no new ones will
+        # be probed as long as the device is blocked
+        # @param val [Boolean]
+        # @return [void]
         def blocked=(val)
             if ! [ true, false ].include?(val)
                 raise ArgumentError, "value must be a boolean"
@@ -533,7 +584,8 @@ module BLE
         end
 
         # Received Signal Strength Indicator of the remote
-	# device (inquiry or advertising).
+        # device (inquiry or advertising).
+        # @return [Integer]
         def rssi # optional
             @o_dev[I_DEVICE]['RSSI']
         rescue DBus::Error => e
@@ -544,6 +596,7 @@ module BLE
         end
 
         # Advertised transmitted power level (inquiry or advertising).
+        # @return [Integer]
         def tx_power # optional
             @o_dev[I_DEVICE]['TxPower']
         rescue DBus::Error => e
@@ -555,7 +608,7 @@ module BLE
 
 
         # Refresh list of services and characteristics
-        # @return [false, true]
+        # @return [Boolean]
         def refresh
             refresh!
             true
@@ -565,6 +618,7 @@ module BLE
 
         # Refresh list of services and characteristics
         # @raise [NotConnected] if device is not in a connected state
+        # @return [self]
         def refresh!
             raise NotConnected unless is_connected?
             @services = Hash[@o_dev[I_DEVICE]['GattServices'].map {|p_srv|
@@ -592,8 +646,11 @@ module BLE
             end
         end
 
-        # @raise [NotYetImplemented, NotConnected, SeriviceNotFound,
-        #         CharacteristicNotFound, Unavailable ]
+        # @param service [String, Symbol]
+        # @param characteristic [String, Symbol]
+        # @param raw [Boolean]
+        # @raise [NotYetImplemented, NotConnected, ServiceNotFound,
+        #         CharacteristicNotFound, AccessUnavailable ]
         def [](service, characteristic, raw: false)
             raise NotConnected unless is_connected?
             uuid  = _uuid_characteristic(characteristic)
@@ -618,7 +675,12 @@ module BLE
             end
         end
 
-        def []=(service, characteristic, val)
+        # @param service [String, Symbol]
+        # @param characteristic [String, Symbol]
+        # @param val [Boolean]
+        # @raise [NotYetImplemented, NotConnected, ServiceNotFound,
+        #         CharacteristicNotFound, AccessUnavailable ]
+        def []=(service, characteristic, val, raw: false)
             raise NotConnected unless is_connected?
             uuid  = _uuid_characteristic(characteristic)
             chars = _characteristics(service)
@@ -631,7 +693,13 @@ module BLE
 
             if flags.include?('write') ||
                flags.include?('write-without-response')
-                val = info[:out].call(val) if !raw && info && info[:out]
+                if !raw && info
+                    if info[:vrfy] && !info[:vrfy].call(vall)
+                        raise ArgumentError,
+                              "bad value for characteristic '#{characteristic}'"
+                    end
+                    val = info[:out].call(val) if info[:out]
+                end
                 val = val.unpack('C*')
                 obj[I_GATT_CHARACTERISTIC].WriteValue(val)
             elsif flags.include?('encrypt-write') ||
@@ -642,6 +710,53 @@ module BLE
             end
         end
 
+        private
+
+        def _characteristics(service)
+            if srv = @services[_uuid_service(service)]
+                srv[:characteristics]
+            end
+        end
+        def _uuid_service(service)
+            uuid = case service
+                   when Symbol
+                       if i = Service::NICKNAME[service]
+                           i[:uuid]
+                       end
+                   when UUID::REGEX
+                       service.downcase
+                   when String
+                       if i = Service::TYPE[service]
+                           i[:uuid]
+                       end
+                   end
+            if uuid.nil?
+                raise ArgumentError, "unable to get UUID for service"
+            end
+
+            uuid
+        end
+        def _uuid_characteristic(characteristic)
+            uuid = case characteristic
+                   when Symbol
+                       if i = Characteristic::NICKNAME[characteristic]
+                           i[:uuid]
+                       end
+                   when UUID::REGEX
+                       characteristic.downcase
+                   when String
+                       if i = Characteristic::TYPE[characteristic]
+                           i[:uuid]
+                       end
+                   end
+            if uuid.nil?
+                raise ArgumentError, "unable to get UUID for service"
+            end
+
+            uuid
+        end
+
+
     end
 
     def self.UUID(val)
@@ -649,6 +764,7 @@ module BLE
     end
     
     class UUID
+        REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     end
 
     class Service
@@ -656,18 +772,25 @@ module BLE
         TYPE     = {}
         NICKNAME = {}
 
+        # Get a service description from it's id
+        # @param id [Symbol,String]
+        # @return [Hash]
         def self.[](id)
             case id
             when Symbol      then NICKNAME[id]
-            when UUID_REGEX  then UUID[id]
+            when UUID::REGEX  then UUID[id]
             when String      then TYPE[id]
             else raise ArgumentError, "invalid type for service id"
             end
         end
-        
-        def self.add(uuid, name:, type:, **kargs)
-            if kargs.first 
-                raise ArgumentError, "unknown keyword: #{kargs.first[0]}" 
+
+        # Add a service description
+        # @param uuid [String]
+        # @param name [String]
+        # @param type [String]
+        def self.add(uuid, name:, type:, **opts)
+            if opts.first 
+                raise ArgumentError, "unknown keyword: #{opts.first[0]}" 
             end
 
             uuid = case uuid
@@ -679,7 +802,7 @@ module BLE
                            "-0000-1000-8000-00805F9B34FB")
                        
                    when String
-                       if uuid !~ UUID_REGEX
+                       if uuid !~ UUID::REGEX
                            raise ArgumentError, "not a 128bit uuid string"
                        end
                        uuid
@@ -713,20 +836,8 @@ module BLE
         end
 
 
-        def characteristics
-            @_srv[I_GATT_SERVICE]['Characteristics']
-        end
-
-        def primary
-            @_srv[I_GATT_SERVICE]['Primary']
-        end
-        
-        def uuid
-            @_srv[I_GATT_SERVICE]['UUID']
-        end
     end
 
-    GATT_BASE_UUID="00000000-0000-1000-8000-00805F9B34FB"
     
 
     
@@ -750,22 +861,32 @@ module BLE
         TYPE     = {}
         NICKNAME = {}
         
+        # Get a characteristic description from it's id
+        # @param id [Symbol,String]
+        # @return [Hash]
         def self.[](id)
             case id
             when Symbol      then NICKNAME[id]
-            when UUID_REGEX  then UUID[id]
+            when UUID::REGEX  then UUID[id]
             when String      then TYPE[id]
             else raise ArgumentError, "invalid type for characteristic id"
             end
         end
         
 
-        def self.add(uuid, name:, type:, **kargs)
-            _in   = kargs.delete :in
-            _out  = kargs.delete :out
-            vrfy  = kargs.delete :vrfy            
-            if kargs.first 
-                raise ArgumentError, "unknown keyword: #{kargs.first[0]}" 
+        # Add a characteristic description
+        # @param uuid [String]
+        # @param name [String]
+        # @param type [String]
+        # @option opts :in  [Proc] convert to ruby
+        # @option opts :out [Proc] convert to bluetooth data
+        # @option opts :vry [Proc] verify
+        def self.add(uuid, name:, type:, **opts)
+            _in   = opts.delete :in
+            _out  = opts.delete :out
+            vrfy  = opts.delete :vrfy            
+            if opts.first 
+                raise ArgumentError, "unknown keyword: #{opts.first[0]}" 
             end
 
             uuid = case uuid
@@ -777,7 +898,7 @@ module BLE
                            "-0000-1000-8000-00805F9B34FB")
                        
                    when String
-                       if uuid !~ UUID_REGEX
+                       if uuid !~ UUID::REGEX
                            raise ArgumentError, "not a 128bit uuid string"
                        end
                        uuid
@@ -807,29 +928,17 @@ module BLE
                 NICKNAME[key] = UUID[uuid]
             end
         end
-
-
-        def flags
-            @_srv[I_GATT_CHARACTERISTIC]['Flags']
-        end
     end
     
-    DBUS  = DBus.system_bus
-    BLUEZ = DBUS.service('org.bluez')
 
+    # Check if Bluetooth API is accessible
     def self.ok?
         BLUEZ.exists?
     end
     
-    def self.adapters
-        o_bluez = BLUEZ.object('/org/bluez')
-        o_bluez.introspect
-        o_bluez.subnodes.reject {|adapter| ['test'].include?(adapter) }
-    end
-
 end
 
-require_relative 'ble/characteristic_db'
 require_relative 'ble/db_service'
+require_relative 'ble/db_characteristic'
 
 
