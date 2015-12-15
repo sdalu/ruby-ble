@@ -1,7 +1,7 @@
 # ruby-ble
 Bluetooth Low Energy for Ruby
 
-## Requirements
+## Requirements
 * bluez >= 5.36 (available on debian testing)
 * `bluetoothd` started with option `-E` (experimental)
 
@@ -16,7 +16,7 @@ $a.start_discovery
 sleep(2)
 $a.stop_discovery
 
-# Get devise and connect to it
+# Get device and connect to it
 $d = $a['F4:AD:CB:FB:B4:85']
 $d.connect
 
