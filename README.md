@@ -1,5 +1,6 @@
 # ruby-ble
 Bluetooth Low Energy for Ruby
+[![Gem Version](https://badge.fury.io/rb/ble.svg)](https://badge.fury.io/rb/ble)
 
 ## Requirements
 * bluez >= 5.36 (available on debian testing)
