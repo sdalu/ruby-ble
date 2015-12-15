@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.authors       = [ "Stephane D'Alu" ]
   s.email         = [ "stephane.dalu@gmail.com" ]
   s.homepage      = "http://github.com/sdalu/ruby-ble"
-  s.summary       = "Bluetooth Low Energy API"
+  s.summary       = "Bluetooth Low Energy (BLE) API"
   s.description   = "Allow access to Bluetooth Low Energy device from ruby"
 
   s.add_dependency "ruby-dbus"
