@@ -1,5 +1,5 @@
 module BLE
-class Service
+module Service
     add 0x1800,
         name: 'Generic Access',
         type: 'org.bluetooth.service.generic_access'

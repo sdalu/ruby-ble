@@ -8,9 +8,8 @@ require 'logger'
 
 #
 module BLE
-    
-
     private
+    # Interfaces
     I_ADAPTER              = 'org.bluez.Adapter1'
     I_DEVICE               = 'org.bluez.Device1'
     I_AGENT_MANAGER        = 'org.bluez.AgentManager1'
@@ -21,6 +20,7 @@ module BLE
     I_PROPERTIES           = 'org.freedesktop.DBus.Properties'
     I_INTROSPECTABLE       = 'org.freedesktop.DBus.Introspectable'
 
+    # Errors
     E_IN_PROGRESS          = 'org.bluez.Error.InProgress'
     E_FAILED               = 'org.bluez.Error.Failed'
     E_NOT_READY            = 'org.bluez.Error.NotReady'
@@ -36,24 +36,30 @@ module BLE
     E_AUTH_REJECTED        = 'org.bluez.Error.AuthenticationRejected'
     E_AUTH_TIMEOUT         = 'org.bluez.Error.AuthenticationTimeout'
     E_AUTH_ATTEMPT_FAILED  = 'org.bluez.Error.ConnectionAttemptFailed'
-
     E_UNKNOWN_OBJECT       = 'org.freedesktop.DBus.Error.UnknownObject'
     E_INVALID_ARGS         = 'org.freedesktop.DBus.Error.InvalidArgs'
     E_INVALID_SIGNATURE    = 'org.freedesktop.DBus.Error.InvalidSignature'
 
-    DBUS  = DBus.system_bus
-    BLUEZ = DBUS.service('org.bluez')
+    # Bus
+    DBUS                   = DBus.system_bus
+    BLUEZ                  = DBUS.service('org.bluez')
 
     public
+    # Generic Error class
     class Error                  < StandardError ; end
+    # Notify of unimplemented part
     class NotYetImplemented      < Error         ; end
+    # Notify that the underlying API object is dead
     class StalledObject          < Error         ; end
+    # Notify that execution wass not able to fulill as some requirement
+    # was not ready. Usually you can wait a little and restart the action.
     class NotReady               < Error         ; end
+    # Notify that you don't have the necessary authorization to perfrom
+    # the operation
     class NotAuthorized          < Error         ; end
-    class NotConnected           < Error         ; end
+    # Notify that some service/characteristic/... is not found
+    # on this device
     class NotFound               < Error         ; end
-    class ServiceNotFound        < NotFound      ; end
-    class CharacteristicNotFound < NotFound      ; end
     class AccessUnavailable      < Error         ; end
     
 
@@ -84,20 +90,16 @@ module BLE
     class UUID
         REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     end
+      
 
-
-    
-
-    
-    
-
-    # Check if Bluetooth API is accessible
+    # Check if Bluetooth underlying API is accessible
     def self.ok?
         BLUEZ.exists?
     end
     
 end
 
+require_relative 'ble/version'
 require_relative 'ble/adapter'
 require_relative 'ble/device'
 require_relative 'ble/service'

@@ -1,5 +1,5 @@
 module BLE
-class Characteristic
+module Characteristic
     #   C         | Integer | 8-bit unsigned (unsigned char)
     #   S         | Integer | 16-bit unsigned, native endian (uint16_t)
     #   L         | Integer | 32-bit unsigned, native endian (uint32_t)
@@ -14,12 +14,11 @@ class Characteristic
     #   >         | Big endian
 
     
-    
     add 0x2A6E,
         name: 'Temperature',
         type: 'org.bluetooth.characteristic.temperature',
         vrfy: ->(x) { (0..100).include?(x) },
-          in: ->(s) { puts s.inspect ; s.unpack('s<').first.to_f / 100 },
+          in: ->(s) { s.unpack('s<').first.to_f / 100 },
          out: ->(v) { [ v*100 ].pack('s<') }
 
     add 0x2A76,

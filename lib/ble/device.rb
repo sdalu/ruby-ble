@@ -8,9 +8,13 @@ module BLE
 #   d[:environmental_sensing, :temperature]
 #
 class Device
-    # @param adapter
-    # @param dev
-    # @param auto_refresh
+    # Notify that you need to have the device in a connected state
+    class NotConnected           < Error         ; end
+
+    # @param adapter      [String]  adapter unix device name
+    # @param dev          [String]  device MAC address
+    # @param auto_refresh [Boolean] gather information about device
+    #                               on connection
     def initialize(adapter, dev, auto_refresh: true)
         @adapter, @dev = adapter, dev
         @auto_refresh  = auto_refresh
@@ -30,7 +34,6 @@ class Device
         
         @o_dev[I_PROPERTIES]
             .on_signal('PropertiesChanged') do |intf, props|
-            puts "#{intf}: #{props.inspect}"
             case intf
             when I_DEVICE
                 case props['Connected']
@@ -189,14 +192,15 @@ class Device
         end
     end
     
-    # List of available services as UUID
+    # List of available services as UUID.
     #
     # @raise [NotConnected] if device is not in a connected state
     # @note The list is retrieve once when object is
     #       connected if auto_refresh is enable, otherwise
-    #       you need to call #refresh
-    # @note This is the list of UUID for which we have an entry
-    #       in the bluez-dbus
+    #       you need to call {#refresh}.
+    # @note This is the list of UUIDs for which we have an entry
+    #       in the underlying api (bluez-dbus), which can be less
+    #       that the list of advertised UUIDs.
     # @return [Array<String>] List of service UUID
     def services
         raise NotConnected unless is_connected?
@@ -209,16 +213,16 @@ class Device
         @service.key?(_uuid_service(service))
     end
     
-    # List of available characteristics UUID for a service
+    # List of available characteristics UUID for a service.
     #
     # @param service service can be a UUID, a service type or
     #               a service nickname
-    # @return [Array<String>, nil] list of characteristics or nil if the
+    # @return [Array<String>, nil] list of characteristics or +nil+ if the
     #                      service doesn't exist
     # @raise [NotConnected] if device is not in a connected state
     # @note The list is retrieve once when object is
     #       connected if auto_refresh is enable, otherwise
-    #       you need to call #refresh
+    #       you need to call {#refresh}.
     def characteristics(service)
         raise NotConnected unless is_connected?
         if chars = _characteristics(service)
@@ -226,16 +230,16 @@ class Device
         end
     end
     
-    # The Bluetooth device address of the remote device
-    # @return [String]
+    # The Bluetooth device address of the remote device.
+    # @return [String] MAC address
     def address
         @o_dev[I_DEVICE]['Address']
     end
     
     # The Bluetooth remote name.
-    # It is better to always use the #alias when displaying the
+    # It is better to always use the {#alias} when displaying the
     # devices name. 
-    # @return [String]
+    # @return [String] name
     def name # optional
         @o_dev[I_DEVICE]['Name']
     end
@@ -279,7 +283,7 @@ class Device
         @o_dev[I_DEVICE]['Blocked']
     end
     
-    # if set to true any incoming connections from the
+    # If set to true any incoming connections from the
     # device will be immediately rejected. Any device
     # drivers will also be removed and no new ones will
     # be probed as long as the device is blocked
@@ -364,18 +368,23 @@ class Device
         end
     end
 
+    # Get value for a service/characteristic.
+    #
     # @param service [String, Symbol]
     # @param characteristic [String, Symbol]
     # @param raw [Boolean]
-    # @raise [NotYetImplemented, NotConnected, ServiceNotFound,
-    #         CharacteristicNotFound, AccessUnavailable ]
+    # @raise [NotConnected] if device is not in a connected state
+    # @raise [NotYetImplemented] encryption is not implemented yet
+    # @raise [Service::NotFound, Characteristic::NotFound] if service/characteristic doesn't exist on this device
+    # @raise [AccessUnavailable] if not available for reading
+    # @return [Object]
     def [](service, characteristic, raw: false)
         raise NotConnected unless is_connected?
         uuid  = _uuid_characteristic(characteristic)
         chars = _characteristics(service)
-        raise ServiceNotFound,        service        if chars.nil?
+        raise Service::NotFound,        service        if chars.nil?
         char  = chars[uuid]
-        raise CharacteristicNotFound, characteristic if char.nil?
+        raise Characteristic::NotFound, characteristic if char.nil?
         flags = char[:flags]
         obj   = char[:obj]
         info  = Characteristic[uuid]
@@ -393,11 +402,16 @@ class Device
         end
     end
 
+    # Set value for a service/characteristic
+    #
     # @param service [String, Symbol]
     # @param characteristic [String, Symbol]
     # @param val [Boolean]
-    # @raise [NotYetImplemented, NotConnected, ServiceNotFound,
-    #         CharacteristicNotFound, AccessUnavailable ]
+    # @raise [NotConnected] if device is not in a connected state
+    # @raise [NotYetImplemented] encryption is not implemented yet
+    # @raise [Service::NotFound, Characteristic::NotFound] if service/characteristic doesn't exist on this device
+    # @raise [AccessUnavailable] if not available for writing
+    # @return [void]
     def []=(service, characteristic, val, raw: false)
         raise NotConnected unless is_connected?
         uuid  = _uuid_characteristic(characteristic)
@@ -426,6 +440,7 @@ class Device
         else
             raise AccessUnavailable
         end
+        nil
     end
     
     private
@@ -437,14 +452,10 @@ class Device
     end
     def _uuid_service(service)
         uuid = case service
-               when Symbol
-                   if i = Service::NICKNAME[service]
-                       i[:uuid]
-                   end
                when UUID::REGEX
                    service.downcase
-               when String
-                   if i = Service::TYPE[service]
+               else
+                   if i = Service[service]
                        i[:uuid]
                    end
                end
@@ -456,15 +467,11 @@ class Device
     end
     def _uuid_characteristic(characteristic)
         uuid = case characteristic
-               when Symbol
-                   if i = Characteristic::NICKNAME[characteristic]
-                           i[:uuid]
-                   end
                when UUID::REGEX
                    characteristic.downcase
-               when String
-                   if i = Characteristic::TYPE[characteristic]
-                       i[:uuid]
+               else
+                   if i = Characteristic[characteristic]
+                           i[:uuid]
                    end
                end
         if uuid.nil?

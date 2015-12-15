@@ -23,17 +23,10 @@ class Adapter
         @o_adapter = BLUEZ.object("/org/bluez/#{@iface}")
         @o_adapter.introspect
         
-        @o_adapter[I_PROPERTIES]
-            .on_signal('PropertiesChanged') do |intf, props|
-            puts "#{intf}: #{props.inspect}"
-            case intf
-            when I_ADAPTER
-                case props['Discovering']
-                when true 
-                when false
-                end
-            end
-        end
+        # @o_adapter[I_PROPERTIES]
+        #     .on_signal('PropertiesChanged') do |intf, props|
+        #     end
+        # end
     end
     
     # The Bluetooth interface name
@@ -83,15 +76,17 @@ class Adapter
     end
     
     # This method sets the device discovery filter for the caller.
-    # When this method is called with nil or an empty list of UUIDs,
+    # When this method is called with +nil+ or an empty list of UUIDs,
     # filter is removed.
+    #
+    # @todo Need to sync with the adapter-api.txt
     #
     # @param uuids     a list of uuid to filter on
     # @param rssi      RSSI threshold
     # @param pathloss  pathloss threshold
     # @param transport [:auto, :bredr, :le]
     #                  type of scan to run (default: :le)
-    # @note need to sync with the adapter-api.txt
+    # @return [self]
     def filter(uuids, rssi: nil, pathloss: nil, transport: :le)
         unless [:auto, :bredr, :le].include?(transport)
             raise ArgumentError,
@@ -119,9 +114,9 @@ class Adapter
     
     # Starts the device discovery session.
     # This includes an inquiry procedure and remote device name resolving.
-    # Use stop_discovery to release the sessions acquired.
-    # This process will start creating device objects as new devices
-    # are discovered.
+    # Use {#stop_discovery} to release the sessions acquired.
+    # This process will start creating device in the underlying api
+    # as new devices are discovered.
     #
     # @return [Boolean]
     def start_discovery
@@ -135,10 +130,10 @@ class Adapter
         end
     end
     
-    # This method will cancel any previous #start_discovery
+    # This method will cancel any previous {#start_discovery}
     # transaction.
     # @note The discovery procedure is shared
-    # between all discovery sessions thus calling stop_discovery
+    # between all discovery sessions thus calling {#stop_discovery}
     # will only release a single session.
     #
     # @return [Boolean]

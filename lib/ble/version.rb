@@ -1,3 +1,4 @@
 module BLE
-    VERSION = "0.0.1"
+    # Library version
+    VERSION = "0.0.2"
 end
