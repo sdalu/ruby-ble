@@ -48,6 +48,7 @@ module BLE
     class Error                  < StandardError ; end
     class NotYetImplemented      < Error         ; end
     class StalledObject          < Error         ; end
+    class NotReady               < Error         ; end
     class NotAuthorized          < Error         ; end
     class NotConnected           < Error         ; end
     class NotFound               < Error         ; end
@@ -621,6 +622,7 @@ module BLE
         # @return [self]
         def refresh!
             raise NotConnected unless is_connected?
+            max_wait ||= 1.5  # Use ||= due to the retry
             @services = Hash[@o_dev[I_DEVICE]['GattServices'].map {|p_srv|
                 o_srv = BLUEZ.object(p_srv)
                 o_srv.introspect
@@ -642,7 +644,15 @@ module BLE
             case e.name
             when E_UNKNOWN_OBJECT
                 raise StalledObject
-            else raise
+            when E_INVALID_ARGS
+                # That's probably because all the bluez information
+                # haven't been collected yet on dbus for GattServices
+                if max_wait > 0
+                    sleep(0.25) ; max_wait -= 0.25 ; retry
+                end
+                raise NotReady
+
+            else raise ScriptError
             end
         end
 
