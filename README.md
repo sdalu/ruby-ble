@@ -1,6 +1,11 @@
 # ruby-ble
 Bluetooth Low Energy for Ruby
 
+## Requirements
+* bluez >= 5.36 (available on debian testing)
+* `bluetoothd` started with option `-E` (experimental)
+
+## Examples
 ```ruby
 # Selecter adapter
 $a = BLE::Adapter.new('hci0')
