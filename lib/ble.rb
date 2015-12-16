@@ -63,6 +63,7 @@ module BLE
     class AccessUnavailable      < Error         ; end
     
 
+    # Base UUID for GATT services defined with 16bit or 32bit UUID
     GATT_BASE_UUID="00000000-0000-1000-8000-00805f9b34fb"
 
     #"DisplayOnly", "DisplayYesNo", "KeyboardOnly",
@@ -82,26 +83,6 @@ module BLE
     end
 
 
-
-    def self.UUID(val)
-        case val
-        when Integer
-            if !(0..4294967295).include?(val)  # 2**32-1
-                raise ArgumentError, "not a 16-bit or 32-bit UUID"
-            end
-            ([val].pack("L>").unpack('H*').first + GATT_BASE_UUID[8..-1])
-        when String
-            if val !~ UUID::REGEX
-                raise ArgumentError, "not a 128bit uuid string"
-            end
-            val.downcase
-        else raise ArgumentError, "invalid uuid type"
-        end
-    end
-    
-    class UUID
-        REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    end
       
 
     # Check if Bluetooth underlying API is accessible
@@ -112,6 +93,7 @@ module BLE
 end
 
 require_relative 'ble/version'
+require_relative 'ble/uuid'
 require_relative 'ble/adapter'
 require_relative 'ble/device'
 require_relative 'ble/service'
