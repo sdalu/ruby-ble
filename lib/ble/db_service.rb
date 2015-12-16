@@ -55,6 +55,5 @@ module Service
     add 0x181D,
         name: 'Weight Scale',
         type: 'org.bluetooth.service.weight_scale'
-    
 end
 end

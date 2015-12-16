@@ -63,7 +63,7 @@ module BLE
     class AccessUnavailable      < Error         ; end
     
 
-    GATT_BASE_UUID="00000000-0000-1000-8000-00805F9B34FB"
+    GATT_BASE_UUID="00000000-0000-1000-8000-00805f9b34fb"
 
     #"DisplayOnly", "DisplayYesNo", "KeyboardOnly",
     # "NoInputNoOutput" and "KeyboardDisplay" which
@@ -84,7 +84,19 @@ module BLE
 
 
     def self.UUID(val)
-        val.downcase
+        case val
+        when Integer
+            if !(0..4294967295).include?(val)  # 2**32-1
+                raise ArgumentError, "not a 16-bit or 32-bit UUID"
+            end
+            ([val].pack("L>").unpack('H*').first + GATT_BASE_UUID[8..-1])
+        when String
+            if val !~ UUID::REGEX
+                raise ArgumentError, "not a 128bit uuid string"
+            end
+            val.downcase
+        else raise ArgumentError, "invalid uuid type"
+        end
     end
     
     class UUID
@@ -108,5 +120,7 @@ require_relative 'ble/agent'
 
 require_relative 'ble/db_service'
 require_relative 'ble/db_characteristic'
+require_relative 'ble/db_eddystone'
+require_relative 'ble/db_nordic'
 
 

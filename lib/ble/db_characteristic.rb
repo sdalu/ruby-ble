@@ -13,6 +13,70 @@ module Characteristic
     #   <         | Little endian
     #   >         | Big endian
 
+    add 0x2A23,
+        name: 'System ID',
+        type: 'org.bluetooth.characteristic.system_id',
+        vrfy: ->(x) { (0..1099511627775).include?(x[0]) &&
+                      (0..16777215     ).include?(x[1])},
+          in: ->(s) { raise NotYetImplemented },
+         out: ->(v) { raise NotYetImplemented }
+
+    add 0x2A24,
+        name: 'Model Number String',
+        type: 'org.bluetooth.characteristic.model_number_string',
+          in: ->(s) { s.force_encoding('UTF-8') },
+         out: ->(v) { v.encode('UTF-8') }
+
+    add 0x2A25,
+        name: 'Serial Number String',
+        type: 'org.bluetooth.characteristic.serial_number_string',
+          in: ->(s) { s.force_encoding('UTF-8') },
+         out: ->(v) { v.encode('UTF-8') }
+
+    add 0x2A26,
+        name: 'Firmware Revision String',
+        type: 'org.bluetooth.characteristic.firmware_revision_string',
+          in: ->(s) { s.force_encoding('UTF-8') },
+         out: ->(v) { v.encode('UTF-8') }
+
+    add 0x2A27,
+        name: 'Hardware Revision String',
+        type: 'org.bluetooth.characteristic.hardware_revision_string',
+          in: ->(s) { s.force_encoding('UTF-8') },
+         out: ->(v) { v.encode('UTF-8') }
+
+    add 0x2A28,
+        name: 'Software Revision String',
+        type: 'org.bluetooth.characteristic.software_revision_string',
+          in: ->(s) { s.force_encoding('UTF-8') },
+         out: ->(v) { v.encode('UTF-8') }
+
+    add 0x2A29,
+        name: 'Manufacturer Name String',
+        type: 'org.bluetooth.characteristic.manufacturer_name_string',
+          in: ->(s) { s.force_encoding('UTF-8') },
+         out: ->(v) { v.encode('UTF-8') }
+    
+    add 0x2A2A,
+        name: 'IEEE 11073-20601 Regulatory Certification Data List',
+        type: 'org.bluetooth.characteristic.ieee_11073-20601_regulatory_certification_data_list',
+          in: ->(s) { raise NotYetImplemented },
+         out: ->(v) { raise NotYetImplemented }
+    
+    add 0x2A50,
+        name: 'PnP ID',
+        type: 'org.bluetooth.characteristic.pnp_id',
+         in: ->(s) { vendor_src, vendor_id,
+                     product_id, product_version = s.unpack('CS<S<S<')
+                     vendor_src = case vendor_src
+                                  when 1 then :bluetooth_sig
+                                  when 2 then :usb_forum
+                                  else        :reserved
+                                  end
+                     [ vendor_src, vendor_id,
+                       product_id, product_version ] },
+         out: ->(v) { raise NotYetImplemented }
+    
     
     add 0x2A6E,
         name: 'Temperature',
@@ -65,6 +129,7 @@ module Characteristic
         type: 'org.bluetooth.characteristic.altitude',
         vrfy: ->(x) { x >= 0 },
           in: ->(s) { s.unpack('S<').first },
-         out: ->(v) { [ v ].pack('S<') }
+          out: ->(v) { [ v ].pack('S<') }
+
 end
 end

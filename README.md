@@ -24,4 +24,13 @@ $d.connect
 # Get temperature from the environmental sensing service
 $d[:environmental_sensing, :temperature]
 
+# Dump device information
+srv = :device_information
+$d.characteristics(srv).each {|uuid|
+    info  = BLE::Characteristic[uuid]
+    name  = info.nil? ? uuid : info[:name]
+    value = $d[srv, uuid] rescue '/!\\ not-readable /!\\'
+    puts "%-30s: %s" % [ name, value ]
+}
+
 ```

@@ -71,6 +71,7 @@ class Device
     # all other cases the default agent will handle this just fine.
     # In case there is no application agent and also
     # no default agent present, this method will fail.
+    #
     # @return [Boolean]
     def pair
         @o_dev[I_DEVICE].Pair
@@ -201,6 +202,13 @@ class Device
     # @note This is the list of UUIDs for which we have an entry
     #       in the underlying api (bluez-dbus), which can be less
     #       that the list of advertised UUIDs.
+    # @example list available services
+    #   $d.services.each {|uuid|
+    #     info = BLE::Service[uuid]
+    #     name = info.nil? ? uuid : info[:name]
+    #     puts name
+    #   }
+    #
     # @return [Array<String>] List of service UUID
     def services
         raise NotConnected unless is_connected?
