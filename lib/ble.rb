@@ -118,8 +118,8 @@ require_relative 'ble/service'
 require_relative 'ble/characteristic'
 require_relative 'ble/agent'
 
-require_relative 'ble/db_service'
-require_relative 'ble/db_characteristic'
+require_relative 'ble/db_sig_service'
+require_relative 'ble/db_sig_characteristic'
 require_relative 'ble/db_eddystone'
 require_relative 'ble/db_nordic'
 
