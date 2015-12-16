@@ -1,6 +1,6 @@
 module BLE
     # Cast value to a well-formatted 128bit UUID string
-    # @param [String, Integer] uuid
+    # @param [String, Integer] val uuid
     # @return [String] well formated 128bit UUID
     def self.UUID(val)
         case val
