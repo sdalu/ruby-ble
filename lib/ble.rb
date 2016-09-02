@@ -61,7 +61,8 @@ module BLE
     # on this device
     class NotFound               < Error         ; end
     class AccessUnavailable      < Error         ; end
-    
+    class NotSupported      < Error         ; end
+
 
     # Base UUID for GATT services defined with 16bit or 32bit UUID
     GATT_BASE_UUID="00000000-0000-1000-8000-00805f9b34fb"
@@ -74,22 +75,22 @@ module BLE
         raise NotYetImplemented
         bus = DBus.session_bus
         service = bus.request_service("org.ruby.service")
-        
+
         service.export(BLE::Agent.new(agent_path))
-        
+
         o_bluez = BLUEZ.object('/org/bluez')
         o_bluez.introspect
         o_bluez[I_AGENT_MANAGER].RegisterAgent(agent_path, "NoInputNoOutput")
     end
 
 
-      
+
 
     # Check if Bluetooth underlying API is accessible
     def self.ok?
         BLUEZ.exists?
     end
-    
+
 end
 
 require_relative 'ble/version'

@@ -19,19 +19,19 @@ class Device
         @adapter, @dev = adapter, dev
         @auto_refresh  = auto_refresh
         @services      = {}
-        
+
         @n_adapter = adapter
         @p_adapter = "/org/bluez/#{@n_adapter}"
         @o_adapter = BLUEZ.object(@p_adapter)
         @o_adapter.introspect
-        
+
         @n_dev     = 'dev_' + dev.tr(':', '_')
         @p_dev     = "/org/bluez/#{@n_adapter}/#{@n_dev}"
         @o_dev     = BLUEZ.object(@p_dev)
         @o_dev.introspect
-        
+
         self.refresh if @auto_refresh
-        
+
         @o_dev[I_PROPERTIES]
             .on_signal('PropertiesChanged') do |intf, props|
             case intf
@@ -43,7 +43,7 @@ class Device
             end
         end
     end
-    
+
     # This removes the remote device object.
     # It will remove also the pairing information.
     # @return [Boolean]
@@ -58,8 +58,8 @@ class Device
         else raise ScriptError
         end
     end
-    
-    
+
+
     # This method will connect to the remote device,
     # initiate pairing and then retrieve all SDP records
     # (or GATT primary services).
@@ -89,7 +89,7 @@ class Device
         else raise ScriptError
         end
     end
-    
+
     # This method can be used to cancel a pairing
     # operation initiated by the Pair method.
     # @return [Boolean]
@@ -103,7 +103,7 @@ class Device
         else raise ScriptError
         end
     end
-    
+
     # This connect to the specified profile UUID or to any (:all)
     # profiles the remote device supports that can be connected to
     # and have been flagged as auto-connectable on our side.  If
@@ -134,7 +134,7 @@ class Device
         else raise ScriptError
         end
     end
-    
+
     # This method gracefully disconnects :all connected profiles
     # and then terminates low-level ACL connection.
     # ACL connection will be terminated even if some profiles
@@ -162,7 +162,7 @@ class Device
         when E_INVALID_ARGUMENTS
             raise ArgumentError, "unsupported profile (#{profile})"
         when E_NOT_SUPPORTED
-            raise NotSuppported
+            raise NotSupported
         when E_NOT_CONNECTED
             true
         when E_UNKNOWN_OBJECT
@@ -170,7 +170,7 @@ class Device
         else raise ScriptError
         end
     end
-    
+
     # Indicates if the remote device is paired
     def is_paired?
         @o_dev[I_DEVICE]['Paired']
@@ -181,7 +181,7 @@ class Device
         else raise ScriptError
         end
     end
-    
+
     # Indicates if the remote device is currently connected.
     def is_connected?
         @o_dev[I_DEVICE]['Connected']
@@ -192,7 +192,7 @@ class Device
         else raise ScriptError
         end
     end
-    
+
     # List of available services as UUID.
     #
     # @raise [NotConnected] if device is not in a connected state
@@ -214,13 +214,13 @@ class Device
         raise NotConnected unless is_connected?
         @services.keys
     end
-    
+
     # Check if service is available on the device
     # @return [Boolean]
     def has_service?(service)
         @service.key?(_uuid_service(service))
     end
-    
+
     # List of available characteristics UUID for a service.
     #
     # @param service service can be a UUID, a service type or
@@ -237,21 +237,21 @@ class Device
             chars.keys
         end
     end
-    
+
     # The Bluetooth device address of the remote device.
     # @return [String] MAC address
     def address
         @o_dev[I_DEVICE]['Address']
     end
-    
+
     # The Bluetooth remote name.
     # It is better to always use the {#alias} when displaying the
-    # devices name. 
+    # devices name.
     # @return [String] name
     def name # optional
         @o_dev[I_DEVICE]['Name']
     end
-    
+
     # The name alias for the remote device.
     # The alias can be used to have a different friendly name for the
     # remote device.
@@ -267,13 +267,13 @@ class Device
     def alias=(val)
         @o_dev[I_DEVICE]['Alias'] = val.nil? ? "" : val.to_str
     end
-    
+
     # Is the device trusted?
     # @return [Boolean]
     def is_trusted?
         @o_dev[I_DEVICE]['Trusted']
     end
-    
+
     # Indicates if the remote is seen as trusted. This
     # setting can be changed by the application.
     # @param val [Boolean]
@@ -284,13 +284,13 @@ class Device
         end
         @o_dev[I_DEVICE]['Trusted'] = val
     end
-    
+
     # Is the device blocked?
     # @return [Boolean]
     def is_blocked?
         @o_dev[I_DEVICE]['Blocked']
     end
-    
+
     # If set to true any incoming connections from the
     # device will be immediately rejected. Any device
     # drivers will also be removed and no new ones will
@@ -303,7 +303,7 @@ class Device
         end
         @o_dev[I_DEVICE]['Blocked'] = val
     end
-    
+
     # Received Signal Strength Indicator of the remote
     # device (inquiry or advertising).
     # @return [Integer]
@@ -315,7 +315,7 @@ class Device
         else raise ScriptError
         end
     end
-    
+
     # Advertised transmitted power level (inquiry or advertising).
     # @return [Integer]
     def tx_power # optional
@@ -326,8 +326,8 @@ class Device
         else raise ScriptError
         end
     end
-    
-    
+
+
     # Refresh list of services and characteristics
     # @return [Boolean]
     def refresh
@@ -336,7 +336,7 @@ class Device
     rescue NotConnected, StalledObject
         false
     end
-    
+
     # Refresh list of services and characteristics
     # @raise [NotConnected] if device is not in a connected state
     # @return [self]
@@ -371,7 +371,7 @@ class Device
                 sleep(0.25) ; max_wait -= 0.25 ; retry
             end
             raise NotReady
-            
+
         else raise ScriptError
         end
     end
@@ -430,7 +430,7 @@ class Device
         flags = char[:flags]
         obj   = char[:obj]
         info  = Characteristic[uuid]
-        
+
         if flags.include?('write') ||
            flags.include?('write-without-response')
             if !raw && info
@@ -450,9 +450,9 @@ class Device
         end
         nil
     end
-    
+
     private
-    
+
     def _characteristics(service)
         if srv = @services[_uuid_service(service)]
             srv[:characteristics]
@@ -470,7 +470,7 @@ class Device
         if uuid.nil?
             raise ArgumentError, "unable to get UUID for service"
         end
-        
+
         uuid
     end
     def _uuid_characteristic(characteristic)
@@ -485,7 +485,7 @@ class Device
         if uuid.nil?
             raise ArgumentError, "unable to get UUID for service"
         end
-        
+
         uuid
     end
 end

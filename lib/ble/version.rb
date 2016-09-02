@@ -1,4 +1,9 @@
 module BLE
-    # Library version
-    VERSION = "0.0.3"
+  # Library version
+
+  #
+  # 0.0.3 PATCH
+  # - [FIX] NotSupported exeption was not declared.
+  #
+  VERSION = '0.0.3'
 end
