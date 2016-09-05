@@ -13,6 +13,13 @@ module Characteristic
     #   <         | Little endian
     #   >         | Big endian
 
+    add 0x2A07,
+        name: 'Tx Power Level',
+        type: 'org.bluetooth.characteristic.tx_power_level',
+        vrfy: ->(x) { (-100..20).include?(c) },
+          in: ->(s) { s.unpack('c').first },
+         out: ->(v) { [ v ].pack('c') }
+
     add 0x2A23,
         name: 'System ID',
         type: 'org.bluetooth.characteristic.system_id',
