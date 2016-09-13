@@ -111,7 +111,7 @@ module Characteristic
     # @option opts :out  [Proc] convert to bluetooth data
     # @option opts :vry  [Proc] verify
     # @return [Hash] characteristic description
-    def self.add(uuid, name:, **opts)
+    def self.add(uuid, name, **opts)
         uuid = BLE::UUID(uuid)
         type =  opts.delete :type
         nick = opts.delete :nick
