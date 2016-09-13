@@ -483,7 +483,7 @@ class Device
                    end
                end
         if uuid.nil?
-            raise ArgumentError, "unable to get UUID for service"
+            raise ArgumentError, "unable to get UUID for characteristic"
         end
 
         uuid
