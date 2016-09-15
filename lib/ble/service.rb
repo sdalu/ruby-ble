@@ -83,7 +83,7 @@ module Service
     # @option opts :type [String] type
     # @option opts :nick [Symbol] nickname
     # @return [Hash] service description
-    def self.add(uuid, name, **opts)
+    def self.add(uuid, name:, **opts)
         uuid = BLE::UUID(uuid)
         type = opts.delete :type
         nick = opts.delete :nick
