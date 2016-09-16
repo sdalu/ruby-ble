@@ -434,7 +434,7 @@ class Device
         if flags.include?('write') ||
            flags.include?('write-without-response')
             if !raw && info
-                if info[:vrfy] && !info[:vrfy].call(vall)
+                if info[:vrfy] && !info[:vrfy].call(val)
                     raise ArgumentError,
                           "bad value for characteristic '#{characteristic}'"
                 end
@@ -453,6 +453,8 @@ class Device
 
     private
 
+    # @param service [String, Symbol] The id of the service.
+    # @return [Hash] The descriptions of the characteristics for the given service.
     def _characteristics(service)
         if srv = @services[_uuid_service(service)]
             srv[:characteristics]
@@ -483,7 +485,7 @@ class Device
                    end
                end
         if uuid.nil?
-            raise ArgumentError, "unable to get UUID for service"
+            raise ArgumentError, "unable to get UUID for characteristic"
         end
 
         uuid
