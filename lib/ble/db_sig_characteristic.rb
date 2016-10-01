@@ -1,5 +1,5 @@
 module BLE
-module Characteristic
+  class Characteristic
     #   C         | Integer | 8-bit unsigned (unsigned char)
     #   S         | Integer | 16-bit unsigned, native endian (uint16_t)
     #   L         | Integer | 32-bit unsigned, native endian (uint32_t)
@@ -56,13 +56,13 @@ module Characteristic
         type: 'org.bluetooth.characteristic.manufacturer_name_string',
           in: ->(s) { s.force_encoding('UTF-8') },
          out: ->(v) { v.encode('UTF-8') }
-    
+
     add 0x2A2A,
         name: 'IEEE 11073-20601 Regulatory Certification Data List',
         type: 'org.bluetooth.characteristic.ieee_11073-20601_regulatory_certification_data_list',
           in: ->(s) { raise NotYetImplemented },
          out: ->(v) { raise NotYetImplemented }
-    
+
     add 0x2A50,
         name: 'PnP ID',
         type: 'org.bluetooth.characteristic.pnp_id',
@@ -76,8 +76,8 @@ module Characteristic
                      [ vendor_src, vendor_id,
                        product_id, product_version ] },
          out: ->(v) { raise NotYetImplemented }
-    
-    
+
+
     add 0x2A6E,
         name: 'Temperature',
         type: 'org.bluetooth.characteristic.temperature',

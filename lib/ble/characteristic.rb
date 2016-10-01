@@ -1,154 +1,85 @@
+require 'forwardable'
 module BLE
-# Build information about {https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicsHome.aspx Bluetooth Characteristics}
-#
-# To add a new characteristic description:
-#   BLE::Characteristic.add 'c4935338-4307-47cf-ae1f-feac9e2b3ae7',
-#       name: 'Controlled mind',
-#       type: 'net.cortex-minus.characteristic.controlled_mind'
-#       vrfy: ->(x) { x >= 0 },
-#         in: ->(s) { s.unpack('s<').first },
-#        out: ->(v) { [ v ].pack('s<') }    
-# 
-# Returned characteristic description will be a hash:
-#   {
-#      name: "Bluetooth characteristic name",
-#      type: "org.bluetooth.characteristic.name",
-#      uuid: "128bit-uuid-string",
-#      vrfy: ->(x) { verify_value(x) },
-#        in: ->(s) { s.unpack(....) ... },
-#       out: ->(v) { [ v ].pack(....) ... }    
-#   }
-#    
-module Characteristic
+  # Build information about {https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicsHome.aspx Bluetooth Characteristics}
+  #
+  class Characteristic
+    include CharRegistry
+    extend Forwardable
+
     # Notify of characteristic not found
-    class NotFound < BLE::NotFound 
+    class NotFound < BLE::NotFound
     end
+
+    def initialize(desc)
+      @dbus_obj= desc[:obj]
+      @desc= CharDesc.new(desc)
+    end
+
+    def_delegators :@desc, :flag?, :uuid
 
     private
     FLAGS    = [ 'broadcast',
-		 'read',
-		 'write-without-response',
-		 'write',
-		 'notify',
-		 'indicate',
-		 'authenticated-signed-writes',
-		 'reliable-write',
-		 'writable-auxiliaries',
-		 'encrypt-read',
-		 'encrypt-write',
-		 'encrypt-authenticated-read',
-		 'encrypt-authenticated-write' ]
-    
-    DB_UUID     = {}
-    DB_TYPE     = {}
-    DB_NICKNAME = {}
-    
+      'read',
+      'write-without-response',
+      'write',
+      'notify',
+      'indicate',
+      'authenticated-signed-writes',
+      'reliable-write',
+      'writable-auxiliaries',
+      'encrypt-read',
+      'encrypt-write',
+      'encrypt-authenticated-read',
+      'encrypt-authenticated-write' ]
+
+
+    #++++++++++++++++++++++++++++
     public
-    # Get characteristic description from nickname.
-    #
-    # @param id [Symbol] nickname
-    # @return [Hash] characteristic description
-    def self.by_nickname(id)
-        DB_NICKNAME[id]
+    #++++++++++++++++++++++++++++
+
+    def write(val, raw: false)
+      val= _serialize_value(val, raw: raw)
+      @dbus_obj[I_GATT_CHARACTERISTIC].WriteValue(val)
     end
 
-    # Get characteristic description from uuid.
-    #
-    # @param id [String] uuid
-    # @return [Hash] characteristic description
-    def self.by_uuid(id)
-        DB_UUID[id]
+    def read(raw: false)
+      val= @dbus_obj[I_GATT_CHARACTERISTIC].ReadValue().first
+      val= _deserialize_value(val, raw: raw)
     end
 
-    # Get characteristic description from type
-    #
-    # @param id [Strig] type
-    # @return [Hash] characteristic description
-    def self.by_type(id)
-        DB_TYPE[id]
+    # Register to this characteristic for notifications when
+    # its value changes.
+    def notify!
+      @dbus_obj[I_GATT_CHARACTERISTIC].StartNotify
     end
-    
-    # Get a characteristic description from it's id
-    # @param id [Symbol,String]
-    # @return [Hash]
-    def self.[](id)
-        case id
-        when Symbol      then DB_NICKNAME[id]
-        when UUID::REGEX then DB_UUID[id]
-        when String      then DB_TYPE[id]
-        when Integer     then DB_UUID[BLE::UUID(id)]
-        else raise ArgumentError, "invalid type for characteristic id"
-        end
-    end
-    
 
-    # Add a characteristic description.
-    # @example Add a characteristic description with a 16-bit uuid
-    #   module Characteristic
-    #       add 0x2A6E,
-    #           name: 'Temperature',
-    #           type: 'org.bluetooth.characteristic.temperature',
-    #           vrfy: ->(x) { (0..100).include?(x) },
-    #             in: ->(s) { s.unpack('s<').first.to_f / 100 },
-    #            out: ->(v) { [ v*100 ].pack('s<') }
-    #   end
-    #
-    # @example Add a characteristic description with a 128-bit uuid
-    #   module Characteristic
-    #       add 'c4935338-4307-47cf-ae1f-feac9e2b3ae7',
-    #           name: 'Controlled mind',
-    #           type: 'net.cortex-minus.characteristic.controlled_mind',
-    #           vrfy: ->(x) { x >= 0 },
-    #             in: ->(s) { s.unpack('s<').first },
-    #            out: ->(v) { [ v ].pack('s<') }    
-    #   end
-    #
-    # @param uuid [Integer, String] 16-bit, 32-bit or 128-bit uuid
-    # @param name [String]
-    # @option opts :type [String] type
-    # @option opts :nick [Symbol] nickname
-    # @option opts :in   [Proc] convert to ruby
-    # @option opts :out  [Proc] convert to bluetooth data
-    # @option opts :vry  [Proc] verify
-    # @return [Hash] characteristic description
-    def self.add(uuid, name:, **opts)
-        uuid = BLE::UUID(uuid)
-        type =  opts.delete :type
-        nick = opts.delete :nick
-        _in  = opts.delete :in
-        _out = opts.delete :out
-        vrfy = opts.delete :vrfy            
-        if opts.first 
-            raise ArgumentError, "unknown keyword: #{opts.first[0]}" 
+    def on_change(raw: false, &callback)
+      @dbus_obj[I_PROPERTIES].on_signal('PropertiesChanged') do |intf, props|
+        case intf
+        when I_GATT_CHARACTERISTIC
+          val= _deserialize_value(props['Value'], raw: raw)
+          callback.call(val)
         end
-        
-        
-        desc = DB_UUID[uuid] = {
-            uuid: uuid,
-            name: name,
-              in: _in,
-             out: _out,
-            vrfy: vrfy
-        }
-        
-        # Add type if specified
-        if type
-            type = type.downcase
-            desc.merge!(type: type)
-            DB_TYPE[type] = desc
-        end
-
-        # Add nickname if specified or can be derived from type
-        if nick.nil? && type && type =~ /\.(?<key>[^.]+)$/
-            nick = $1.to_sym if type.start_with? 'org.bluetooth.characteristic'
-        end
-        if nick
-            if DB_NICKNAME.include?(nick)
-                raise ArgumentError,
-                      "nickname '#{nick}' already registered (uuid: #{uuid})"
-            end
-            DB_NICKNAME[nick] = desc
-        end
+      end
     end
-end
+    #----------------------------
+    private
+    #----------------------------
+
+    # Convert Arrays of bytes returned by DBus to Strings of bytes.
+    def _serialize_value(val, raw: false)
+      if !raw && @desc.write_processors?
+        val= @desc.pre_process(val)
+      end
+      val.unpack('C*')
+    end
+
+    # Convert Arrays of bytes returned by DBus to Strings of bytes.
+    def _deserialize_value(val, raw: false)
+      val = val.pack('C*')
+      val = @desc.post_process(val) if !raw && @desc.read_processors?
+      val
+    end
+
+  end
 end

@@ -6,8 +6,8 @@ end
 end
 
 module BLE
-module Characteristic
-    add 'ee0c2081-8786-40ba-ab96-99b91ac981d8',
+class Characteristic
+  add 'ee0c2081-8786-40ba-ab96-99b91ac981d8',
         name: 'Eddystone Lock State',
         nick: :esurl_lockstate
 
