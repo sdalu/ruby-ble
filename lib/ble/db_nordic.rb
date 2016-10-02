@@ -10,8 +10,8 @@ end
 
 
 module BLE
-module Characteristic
-    add '00001531-1212-efde-1523-785feabcd123', # WriteWithoutResponse
+class Characteristic
+  add '00001531-1212-efde-1523-785feabcd123', # WriteWithoutResponse
         name: 'DFU Packet'
 
     add '00001532-1212-efde-1523-785feabcd123', # Write,Notify

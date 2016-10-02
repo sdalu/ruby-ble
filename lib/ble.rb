@@ -96,8 +96,11 @@ end
 require_relative 'ble/version'
 require_relative 'ble/uuid'
 require_relative 'ble/adapter'
+require_relative 'ble/char_desc'
+require_relative 'ble/notifications'
 require_relative 'ble/device'
 require_relative 'ble/service'
+require_relative 'ble/char_registry'
 require_relative 'ble/characteristic'
 require_relative 'ble/agent'
 
