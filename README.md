@@ -36,3 +36,6 @@ $d.characteristics(srv).each {|uuid|
 }
 
 ```
+
+## Contributors
+* Oliver Valls (tramuntanal): Bug fixes / BLE Notification support
