@@ -82,11 +82,11 @@ module BLE
       when E_INVALID_ARGUMENTS      then false
       when E_FAILED                 then false
       when E_ALREADY_EXISTS         then true
-      when E_AUTH_CANCELED          then raise NotAutorized
-      when E_AUTH_FAILED            then raise NotAutorized
-      when E_AUTH_REJECTED          then raise NotAutorized
-      when E_AUTH_TIMEOUT           then raise NotAutorized
-      when E_AUTH_ATTEMPT_FAILED    then raise NotAutorized
+      when E_AUTH_CANCELED          then raise NotAuthorized
+      when E_AUTH_FAILED            then raise NotAuthorized
+      when E_AUTH_REJECTED          then raise NotAuthorized
+      when E_AUTH_TIMEOUT           then raise NotAuthorized
+      when E_AUTH_ATTEMPT_FAILED    then raise NotAuthorized
       else raise ScriptError
       end
     end
