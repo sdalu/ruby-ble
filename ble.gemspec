@@ -12,6 +12,7 @@ Gem::Specification.new do |s|
   s.description   = "Allow access to Bluetooth Low Energy device from ruby"
 
   s.add_dependency "ruby-dbus"
+  s.add_dependency "concurrent-ruby"
   
   s.add_development_dependency "yard"
   s.add_development_dependency "rake"

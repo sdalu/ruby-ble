@@ -12,6 +12,8 @@ module BLE
     # Notify that you need to have the device in a connected state
     class NotConnected           < Error         ; end
 
+    attr_accessor :requires_connection
+
     # @param adapter      [String]  adapter unix device name
     # @param dev          [String]  device MAC address
     # @param auto_refresh [Boolean] gather information about device
@@ -49,7 +51,8 @@ module BLE
     # It will remove also the pairing information.
     # @return [Boolean]
     def remove
-      @o_adapter[I_ADAPTER].RemoveDevice(@p_dev)
+      block_given? ? @o_adapter[I_ADAPTER].RemoveDevice(@p_dev, &Proc.new) :
+                     @o_adapter[I_ADAPTER].RemoveDevice(@p_dev)
       true
     rescue DBus::Error => e
       case e.name
@@ -75,7 +78,8 @@ module BLE
     #
     # @return [Boolean]
     def pair
-      @o_dev[I_DEVICE].Pair
+      block_given? ? @o_dev[I_DEVICE].Pair(&Proc.new) :
+                     @o_dev[I_DEVICE].Pair()
       true
     rescue DBus::Error => e
       case e.name
@@ -95,7 +99,8 @@ module BLE
     # operation initiated by the Pair method.
     # @return [Boolean]
     def cancel_pairing
-      @o_dev[I_DEVICE].CancelPairing
+      block_given? ? @o_dev[I_DEVICE].CancelPairing(&Proc.new) :
+                     @o_dev[I_DEVICE].CancelPairing()
       true
     rescue DBus::Error => e
       case e.name
@@ -116,9 +121,11 @@ module BLE
     def connect(profile=:all)
       case profile
       when UUID::REGEX
-        @o_dev[I_DEVICE].ConnectProfile(profile)
+        block_given? ? @o_dev[I_DEVICE].ConnectProfile(profile, &Proc.new) :
+                       @o_dev[I_DEVICE].ConnectProfile(profile)
       when :all
-        @o_dev[I_DEVICE].Connect()
+        block_given? ? @o_dev[I_DEVICE].Connect(&Proc.new) :
+                       @o_dev[I_DEVICE].Connect()
       else raise ArgumentError, "profile uuid or :all expected"
       end
       true
@@ -149,9 +156,11 @@ module BLE
     def disconnect(profile=:all)
       case profile
       when UUID::REGEX
-        @o_dev[I_DEVICE].DisconnectProfile(profile)
+        block_given? ? @o_dev[I_DEVICE].DisconnectProfile(profile, &Proc.new) :
+                       @o_dev[I_DEVICE].DisconnectProfile(profile)
       when :all
-        @o_dev[I_DEVICE].Disconnect()
+        block_given? ? @o_dev[I_DEVICE].Disconnect(&Proc.new) :
+                       @o_dev[I_DEVICE].Disconnect()
       else raise ArgumentError, "profile uuid or :all expected"
       end
       true
@@ -185,7 +194,7 @@ module BLE
 
     # Indicates if the remote device is currently connected.
     def is_connected?
-      @o_dev[I_DEVICE]['Connected']
+      !@requires_connection || @o_dev[I_DEVICE]['Connected']
     rescue DBus::Error => e
       case e.name
       when E_UNKNOWN_OBJECT
@@ -343,12 +352,14 @@ module BLE
     # @return [self]
     def refresh!
       _require_connection!
-      max_wait ||= 1.5  # Use ||= due to the retry
-      @services = Hash[@o_dev[I_DEVICE]['GattServices'].map {|p_srv|
+      max_wait ||= 1.5 # Use ||= due to the retry
+      @services = Hash[@o_dev.subnodes.map {|p_srv|
+          p_srv = [@o_dev.path, p_srv].join '/'
           o_srv = BLUEZ.object(p_srv)
           o_srv.introspect
-          srv   = o_srv[I_PROPERTIES].GetAll(I_GATT_SERVICE).first
-          char  = Hash[srv['Characteristics'].map {|p_char|
+          srv   = o_srv.GetAll(I_GATT_SERVICE).first
+          char  = Hash[o_srv.subnodes.map {|char|
+              p_char = [o_srv.path, char].join '/'
               o_char = BLUEZ.object(p_char)
               o_char.introspect
               uuid  = o_char[I_GATT_CHARACTERISTIC]['UUID' ].downcase
@@ -387,7 +398,7 @@ module BLE
     # @raise [Service::NotFound, Characteristic::NotFound] if service/characteristic doesn't exist on this device
     # @raise [AccessUnavailable] if not available for reading
     # @return [Object]
-    def [](service, characteristic, raw: false)
+    def [](service, characteristic, raw: false, async: false)
       _require_connection!
       uuid  = _uuid_characteristic(characteristic)
       chars = _characteristics(service)
@@ -396,13 +407,17 @@ module BLE
       raise Characteristic::NotFound, characteristic if char.nil?
 
       if char.flag?('read')
-        char.read(raw: raw)
+         async ? char.async_read(raw: raw) : char.read(raw: raw)
       elsif char.flag?('encrypt-read') ||
           char.flag?('encrypt-authenticated-read')
         raise NotYetImplemented
       else
         raise AccessUnavailable
       end
+    end
+    alias read []
+    def async_read service, characteristic, raw: false
+      read service, characteristic, raw: raw, async: true
     end
 
     # Set value for a service/characteristic
@@ -416,24 +431,43 @@ module BLE
     # @raise [Service::NotFound, Characteristic::NotFound] if service/characteristic doesn't exist on this device
     # @raise [AccessUnavailable] if not available for writing
     # @return [void]
-    def []=(service, characteristic, val, raw: false)
+    def []=(service, characteristic, val, raw: false, async: false)
       _require_connection!
       uuid  = _uuid_characteristic(characteristic)
       chars = _characteristics(service)
-      raise ServiceNotFound,        service        if chars.nil?
+      raise Service::NotFound,        service        if chars.nil?
       char  = chars[uuid]
-      raise CharacteristicNotFound, characteristic if char.nil?
+      raise Characteristic::NotFound, characteristic if char.nil?
 
       if char.flag?('write') ||
-          char.flag?('write-without-response')
-        char.write(val, raw: raw)
+        char.flag?('write-without-response')
+        async ? char.async_write(val, raw: raw) : char.write(val, raw: raw)
       elsif char.flag?('encrypt-write') ||
           char.flag?('encrypt-authenticated-write')
         raise NotYetImplemented
       else
         raise AccessUnavailable
       end
-      nil
+    end
+    alias write []=
+    def async_write(service, characteristic, val,  raw: false)
+      write service, characteristic, val, raw: raw, async: true
+    end
+
+    def subscribe(service, characteristic, raw: false, &block)
+      _require_connection!
+      uuid  = _uuid_characteristic(characteristic)
+      chars = _characteristics(service)
+      raise Service::NotFound,        service        if chars.nil?
+      char  = chars[uuid]
+      raise Characteristic::NotFound, characteristic if char.nil?
+
+      if char.flag? 'notify'
+        char.notify!
+        char.on_change(raw: raw, &block)
+      else
+         raise OperationNotSupportedError.new("No notifications available for characteristic #{characteristic}")
+      end
     end
 
     #---------------------------------
@@ -480,7 +514,7 @@ module BLE
                  characteristic.downcase
              else
                  if char = Characteristic[characteristic]
-                     char.uuid
+                     char[:uuid]
                  end
              end
       if uuid.nil?

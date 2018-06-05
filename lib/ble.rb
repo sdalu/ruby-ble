@@ -108,5 +108,6 @@ require_relative 'ble/db_sig_service'
 require_relative 'ble/db_sig_characteristic'
 require_relative 'ble/db_eddystone'
 require_relative 'ble/db_nordic'
+require_relative 'ble/db_ollie'
 
 

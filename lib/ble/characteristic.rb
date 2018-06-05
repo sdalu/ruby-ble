@@ -1,4 +1,5 @@
 require 'forwardable'
+require 'concurrent'
 module BLE
   # Build information about {https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicsHome.aspx Bluetooth Characteristics}
   #
@@ -39,12 +40,30 @@ module BLE
 
     def write(val, raw: false)
       val= _serialize_value(val, raw: raw)
-      @dbus_obj[I_GATT_CHARACTERISTIC].WriteValue(val)
+      @dbus_obj[I_GATT_CHARACTERISTIC].WriteValue(val, [])
+    end
+
+    def async_write(val, raw: false)
+      val= _serialize_value(val, raw: raw)
+      Concurrent::Promise.execute do
+        @dbus_obj[I_GATT_CHARACTERISTIC].WriteValue(val, []) do |result|
+          result
+        end
+      end
     end
 
     def read(raw: false)
       val= @dbus_obj[I_GATT_CHARACTERISTIC].ReadValue().first
       val= _deserialize_value(val, raw: raw)
+    end
+
+    def async_read(raw: false)
+      return Concurrent::Promise.execute do
+        @dbus_obj[I_GATT_CHARACTERISTIC].ReadValue() do |result|
+          val= result.first
+          val= _deserialize_value(val, raw: raw)
+        end
+      end
     end
 
     # Register to this characteristic for notifications when
